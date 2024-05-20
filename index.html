@@ -237,30 +237,21 @@
         }
       }
 
-    //   function computePSD() {
-    //     const signal = new Float32Array(accelData);
-    //     const fft = new FFT(sampleRate, signal.length);
-    //     const psd = fft.calculatePSD(signal);
-
-    //     const frequencies = fft.calculateFrequencies();
-    //     const limitedFrequencies = frequencies.filter(f => f >= 0 && f <= 25);
-    //     const limitedPSD = psd.slice(0, limitedFrequencies.length);
-
-    //     psdChart.data.labels = limitedFrequencies;
-    //     psdChart.data.datasets[0].data = limitedPSD;
-    //     psdChart.update();
-    //   }
-
     function computePSD() {
         const signal = new Float32Array(accelData);
         const fft = new FFT(signal.length, sampleRate);
         fft.forward(signal);
         const psd = fft.spectrum;
 
+        console.log("PSD values:", psd);
+
         const frequencyStep = sampleRate / signal.length;
         const frequencies = Array.from({ length: psd.length }, (_, i) => i * frequencyStep);
         const limitedFrequencies = frequencies.filter(f => f >= 0 && f <= 25);
         const limitedPSD = psd.slice(0, limitedFrequencies.length);
+
+        console.log("Limited Frequencies:", limitedFrequencies);
+        console.log("Limited PSD values:", limitedPSD);
 
         psdChart.data.labels = limitedFrequencies;
         psdChart.data.datasets[0].data = limitedPSD;
