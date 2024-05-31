@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="en">
   <head>
@@ -7,7 +6,7 @@
     <script language="javascript" src="processing.js"></script>    
     <script language="javascript" src="dsp.js"></script>
     <style>
-      #start_demo, #downloadButton {
+      #start_demo, #downloadButton, #downloadSpectrumButton {
         font-size: 24px;
         padding: 20px;
       }
@@ -15,8 +14,9 @@
   </head>
   <body>
     <main>
-      <h2>Bridge Vibration Tool by Roebling Labs</h2>
+      <h2>Bridge Vibration Tool by <a href="http://www.roeblinglabs.com">Roebling Labs</a> </h2>
       <h2>Instructions</h2>
+      <p><a href="https://youtu.be/AiOQPEUpOTU?si=j4c2Rd0jbu4iQnc6" target="_blank">Watch Demo Video</a></p>
       <p>1. Place phone on bridge with screen facing up.</p>
       <p>2. Select a safe location with the large vibrations, such as on the sidewalk at one-third span.</p>
       <p>3. Wait for a truck to appear.</p>
@@ -37,19 +37,34 @@
         <h2>Power Spectrum Density (PSD)</h2>
         <canvas id="psdChart" width="400" height="200"></canvas>
 
-        <button id="downloadButton" class="btn btn-lg btn-primary py-1">Download Data</button>
-        <h2>Contact with suggestions: scott@roeblinglabs.com</h2>
+        <button id="downloadButton" class="btn btn-lg btn-primary py-1">Download Accelerometer Data</button>
+        <button id="downloadSpectrumButton" class="btn btn-lg btn-secondary py-1">Download Spectrum Data</button>
+
+        <div id="geo-info">
+          <p>Latitude: <span id="geo-latitude"></span></p>
+          <p>Longitude: <span id="geo-longitude"></span></p>
+          <p>Geolocation Accuracy: <span id="geo-accuracy"></span> meters</p>
+          <p>Date: <span id="geo-date"></span></p>
+          <p>Time: <span id="geo-time"></span></p>
+        </div>
+
+        <h2>Contact Us</h2>
+        <p>Subscribe: <a href="https://forms.gle/fH6NiMfZ5ZGGMGwD7" target="_blank">Newsletter</a> </p>
+        <p>User Feedback: <a href="https://forms.gle/MXPPgLcDx8tSyLX49" target="_blank">Questionnaire</a> (4 Q's in 30 seconds)</p>
+        <p>Email: <a href="mailto:scott@roeblinglabs.com">scott@roeblinglabs.com</a></p>
+        <p>Connect: <a href="https://www.linkedin.com/in/scottsnellingpe/" target="_blank">LinkedIn</a></p>
       </div>
     </main>
 
-    <p id="demo"></p>
+    <p id="demo" style="display:none;"></p>
 
     <script>
-      const sampleRate = 50; // Sample rate in Hz
+      const sampleRate = 64; // Sample rate in Hz
       const windowSize = sampleRate * 30; // Display 30 seconds of data
       let accelData = [];
       let isMeasuring = false;
       let geolocation = null;
+      let psdData = { frequencies: [], psdValues: [] };
 
       // Initialize Chart.js charts
       const ctxTimeSeries = document.getElementById('timeSeriesChart').getContext('2d');
@@ -92,7 +107,7 @@
       const psdChart = new Chart(ctxPSD, {
         type: 'line',
         data: {
-          labels: [], // Will be set dynamically
+          // labels: Array.from({ length: 6 }, (_, i) => i * 5), // 0, 5, 10, 15, 20, 25 Hz
           datasets: [{
             label: 'PSD',
             data: [],
@@ -107,8 +122,14 @@
                 display: true,
                 text: 'Frequency (Hz)'
               },
-              min: 0,
-              max: 25
+              // min: 0,
+              // max: 25,
+              ticks: {
+                // stepSize: 5,
+                // callback: function(value) {
+                //   return value % 5 === 0 ? value : '';
+                // }
+              }
             },
             y: {
               title: {
@@ -116,7 +137,10 @@
                 text: 'PSD (g^2/Hz)'
               },
               min: 0,
-              max: 0.02
+              max: 20,
+              ticks: {
+                beginAtZero: true,
+              }
             }
           }
         }
@@ -124,6 +148,7 @@
 
       document.getElementById('start_demo').addEventListener('click', toggleMeasurement);
       document.getElementById('downloadButton').addEventListener('click', downloadData);
+      document.getElementById('downloadSpectrumButton').addEventListener('click', downloadSpectrumData);
 
       function toggleMeasurement(e) {
         e.preventDefault();
@@ -204,16 +229,23 @@
       }
 
       function downloadData() {
+        const date = new Date();
+        const dateString = date.toLocaleDateString();
+        const timeString = date.toLocaleTimeString();
+
+        const csvHeader = `Longitude,${geolocation ? geolocation.coords.longitude : ''}\n` +
+                          `Latitude,${geolocation ? geolocation.coords.latitude : ''}\n` +
+                          `Elevation,${geolocation ? (geolocation.coords.altitude || '') : ''}\n` +
+                          `Temperature,\n` + // If you have temperature data, fill it here
+                          `Date,${dateString}\n` +
+                          `Time,${timeString}\n\n` +
+                          `Timestamp,Z-axis Acceleration (m/s^2)`;
+
         const csvData = accelData.map((z, index) => {
           const timestamp = (index / sampleRate).toFixed(2);
-          const latitude = geolocation ? geolocation.coords.latitude : '';
-          const longitude = geolocation ? geolocation.coords.longitude : '';
-          const altitude = geolocation ? (geolocation.coords.altitude || '') : '';
-          const temperature = ''; // If you have temperature data, fill it here
-          return `${timestamp},${z},${latitude},${longitude},${altitude},${temperature}`;
+          return `${timestamp},${z}`;
         });
 
-        const csvHeader = 'Timestamp,Z-axis Acceleration (m/s^2),Latitude,Longitude,Elevation,Temperature';
         const csvContent = [csvHeader, ...csvData].join('\n');
         const blob = new Blob([csvContent], { type: 'text/csv' });
         const url = URL.createObjectURL(blob);
@@ -224,16 +256,48 @@
         URL.revokeObjectURL(url);
       }
 
+      function downloadSpectrumData() {
+        const date = new Date();
+        const dateString = date.toLocaleDateString();
+        const timeString = date.toLocaleTimeString();
+
+        const csvHeader = `Longitude,${geolocation ? geolocation.coords.longitude : ''}\n` +
+                          `Latitude,${geolocation ? geolocation.coords.latitude : ''}\n` +
+                          `Elevation,${geolocation ? (geolocation.coords.altitude || '') : ''}\n` +
+                          `Temperature,\n` + // If you have temperature data, fill it here
+                          `Date,${dateString}\n` +
+                          `Time,${timeString}\n\n` +
+                          `Frequency (Hz),PSD (g^2/Hz)`;
+
+        const csvData = psdData.frequencies.map((frequency, index) => {
+          return `${frequency},${psdData.psdValues[index]}`;
+        });
+
+        const csvContent = [csvHeader, ...csvData].join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'spectrum_data.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+
       function getGeolocation() {
         if (navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(position => {
             geolocation = position;
-            document.getElementById("demo").innerHTML = "Latitude: " + position.coords.latitude +
-              "<br>Longitude: " + position.coords.longitude +
-              "<br>Geolocation Accuracy: " + position.coords.accuracy + " (meters)";
+            const date = new Date();
+            const dateString = date.toLocaleDateString();
+            const timeString = date.toLocaleTimeString();
+            document.getElementById("geo-latitude").innerText = position.coords.latitude;
+            document.getElementById("geo-longitude").innerText = position.coords.longitude;
+            document.getElementById("geo-accuracy").innerText = position.coords.accuracy;
+            document.getElementById("geo-date").innerText = dateString;
+            document.getElementById("geo-time").innerText = timeString;
           });
         } else {
-          document.getElementById("demo").innerHTML = "Geolocation is not supported by this browser.";
+          document.getElementById("geo-info").innerHTML = "Geolocation is not supported by this browser.";
         }
       }
 
@@ -251,44 +315,48 @@
         return sineWave;
       } 
 
-    function computePSD() {
-
-        // // Sine wave test
-        // const duration = 5; // Duration in seconds
-        // const frequency = 1; // Frequency in Hz
-        // const amplitude = .1; // Amplitude of the sine wave
-        // accelData = generateSineWave(duration, frequency, amplitude);
-
+      function computePSD() {
+      // Sine wave test
+      const duration = 5; // Duration in seconds
+      const frequency = 8; // Frequency in Hz
+      const amplitude = 15; // Amplitude of the sine wave
+      accelData = generateSineWave(duration, frequency, amplitude);
+      
         const signalLength = accelData.length;
+        console.log("accelData.length: " + accelData.length);
         const paddedLength = Math.pow(2, Math.ceil(Math.log2(signalLength)));
-        // const signal = new Float32Array(accelData);
+        console.log("paddedLength: " + paddedLength);
         const paddedSignal = new Float32Array(paddedLength);
         paddedSignal.set(accelData);
         
-        // const fft = new FFT(signal.length, sampleRate);
         const fft = new FFT(paddedLength, sampleRate);
-        
-        const signal = paddedSignal;
-
-        fft.forward(signal);
+        console.log("sampleRate: " + sampleRate);
+        fft.forward(paddedSignal);
         const psd = fft.spectrum;
-
-        console.log("PSD values:", psd);
+        console.log("psd: " + psd);
+        console.log("psd.length: " + psd.length);
 
         const frequencyStep = sampleRate / paddedLength;
+        console.log("frequencyStep: " + frequencyStep);
         const frequencies = Array.from({ length: psd.length }, (_, i) => i * frequencyStep);
-        const limitedFrequencies = frequencies.filter(f => f >= 0 && f <= 25);
+        console.log("frequencies: " + frequencies);
+        console.log("frequencies.length: " + frequencies.length);
+        const limitedFrequencies = frequencies.filter(f => f <= 25);        
+        console.log("limitedFrequencies: " + limitedFrequencies);
+        console.log("limitedFrequencies.length: " + limitedFrequencies.length);
         const limitedPSD = psd.slice(0, limitedFrequencies.length);
+        console.log("limitedPSD: " + limitedPSD);
+        console.log("limitedPSD.length: " + limitedPSD.length);
 
-        console.log("Limited Frequencies:", limitedFrequencies);
-        console.log("Limited PSD values:", limitedPSD);
+        const maxPSD = Math.max(...limitedPSD);
 
-        psdChart.data.labels = limitedFrequencies;
-        psdChart.data.labels = Array.from({ length: 26 }, (_, i) => i);
+        psdChart.options.scales.y.max = Math.max(20, maxPSD);
+        psdChart.data.labels = limitedFrequencies; //.map(f => Math.round(f)); // Convert to integer Hz values
         psdChart.data.datasets[0].data = limitedPSD;
         psdChart.update();
-    }
 
+        psdData = { frequencies: limitedFrequencies, psdValues: limitedPSD };
+      }
     </script>
   </body>
 </html>
