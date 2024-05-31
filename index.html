@@ -316,11 +316,17 @@
       } 
 
       function computePSD() {
-      // // Sine wave test
-      // const duration = 5; // Duration in seconds
-      // const frequency = 8; // Frequency in Hz
-      // const amplitude = 15; // Amplitude of the sine wave
-      // accelData = generateSineWave(duration, frequency, amplitude);
+        // Get the current URL
+        const url = new URL(window.location.href);
+        // Get the value of the query string parameter
+        const sine = url.searchParams.get('sine');
+        if (sine === '1') {    
+            // Sine wave test
+            const duration = 5; // Duration in seconds
+            const frequency = 8; // Frequency in Hz
+            const amplitude = 15; // Amplitude of the sine wave
+            accelData = generateSineWave(duration, frequency, amplitude);
+        }
       
         const signalLength = accelData.length;
         console.log("accelData.length: " + accelData.length);
@@ -350,7 +356,7 @@
 
         const maxPSD = Math.max(...limitedPSD);
 
-        psdChart.options.scales.y.max = Math.max(20, maxPSD);
+        psdChart.options.scales.y.max = maxPSD; // Math.max(20, maxPSD);
         psdChart.data.labels = limitedFrequencies; //.map(f => Math.round(f)); // Convert to integer Hz values
         psdChart.data.datasets[0].data = limitedPSD;
         psdChart.update();
