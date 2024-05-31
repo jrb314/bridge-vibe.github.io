@@ -322,9 +322,9 @@
         const sine = url.searchParams.get('sine');
         if (sine === '1') {    
             // Sine wave test
-            const duration = 5; // Duration in seconds
-            const frequency = 8; // Frequency in Hz
-            const amplitude = 15; // Amplitude of the sine wave
+            const duration = url.searchParams.get('dur') || 1; // Duration in seconds
+            const frequency = url.searchParams.get('freq') || 8; // Frequency in Hz
+            const amplitude = url.searchParams.get('amp') || 12; // Amplitude of the sine wave
             accelData = generateSineWave(duration, frequency, amplitude);
         }
       
